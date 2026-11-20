@@ -1664,6 +1664,42 @@ MOBI_RET mobi_reconstruct_orth(const MOBIRawml *rawml, MOBIFragment *first, size
 }
 
 /**
+ @brief Find a src attribute between from and to
+
+ Mobipocket Creator wrote <img src="BMP" recindex="00001">: once recindex
+ becomes src="resource…", the stale src must go or it is the one a browser
+ takes.
+
+ @param[in] from Start of the search
+ @param[in] to End of the search (exclusive)
+ @param[out] start Whitespace before the attribute
+ @param[out] end Just past the attribute's value
+ @return true when found
+ */
+static bool mobi_find_src_attribute(unsigned char *from, unsigned char *to, unsigned char **start, unsigned char **end) {
+    for (unsigned char *c = from; c + 4 < to; c++) {
+        if (!(*c == ' ' || *c == '\t' || *c == '\r' || *c == '\n')) { continue; }
+        unsigned char *a = c + 1;
+        if ((a[0] | 0x20) != 's' || (a[1] | 0x20) != 'r' || (a[2] | 0x20) != 'c' || a[3] != '=') { continue; }
+        unsigned char *v = a + 4;
+        unsigned char *e = v;
+        if (v < to && (*v == '"' || *v == '\'')) {
+            const unsigned char quote = *v;
+            e = v + 1;
+            while (e < to && *e != quote) { e++; }
+            if (e >= to) { return false; }
+            e++;
+        } else {
+            while (e < to && *e != ' ' && *e != '\t' && *e != '>' && *e != '/') { e++; }
+        }
+        *start = c;
+        *end = e;
+        return true;
+    }
+    return false;
+}
+
+/**
  @brief Replace offset-links with html-links in KF7 markup.
  Also reconstruct dictionary markup if present
  
@@ -1746,6 +1782,29 @@ MOBI_RET mobi_reconstruct_links_kf7(const MOBIRawml *rawml) {
             array_free(links);
             return MOBI_DATA_CORRUPT;
         }
+        unsigned char *src_start = NULL;
+        unsigned char *src_end = NULL;
+        if (attribute[0] != 'f') {
+            /* a stale src earlier in the same tag */
+            unsigned char *tag = data_cur;
+            while (tag > data_in && *(tag - 1) != '<' && *(tag - 1) != '>') { tag--; }
+            if (tag > data_in && *(tag - 1) == '<') {
+                mobi_find_src_attribute(tag, data_cur, &src_start, &src_end);
+            }
+        }
+        if (src_start) {
+            size_t before = (size_t) (src_start - data_in);
+            curr = mobi_list_add(curr, (size_t) (data_in - part->data), data_in, before, false);
+            if (curr == NULL) {
+                mobi_list_del_all(first);
+                array_free(links);
+                debug_print("%s\n", "Memory allocation failed");
+                return MOBI_MALLOC_FAILED;
+            }
+            if (!first) { first = curr; }
+            new_size += curr->size;
+            data_in = src_end;
+        }
         size_t size = (size_t) (data_cur - data_in);
         size_t raw_offset = (size_t) (data_in - part->data);
         curr = mobi_list_add(curr, raw_offset, data_in, size, false);
@@ -1769,6 +1828,36 @@ MOBI_RET mobi_reconstruct_links_kf7(const MOBIRawml *rawml) {
         }
         new_size += curr->size;
         data_in = result.end;
+        if (attribute[0] != 'f') {
+            /* a stale src later in the same tag */
+            unsigned char *gt = data_in;
+            while (gt <= data_end && *gt != '>' && *gt != '<') { gt++; }
+            /* stop before the tag's next link attribute: it is reconstructed
+               on its own turn and must stay ahead of data_in */
+            unsigned char *scan_end = gt;
+            for (unsigned char *c = data_in; c + 8 < gt; c++) {
+                if (strncmp((const char *) c, "recindex=", 9) == 0 || strncmp((const char *) c, "filepos=", 8) == 0) {
+                    scan_end = c;
+                    break;
+                }
+            }
+            unsigned char *after_start = NULL;
+            unsigned char *after_end = NULL;
+            if (gt <= data_end && *gt == '>' && mobi_find_src_attribute(data_in, scan_end, &after_start, &after_end)) {
+                size_t between = (size_t) (after_start - data_in);
+                if (between > 0) {
+                    curr = mobi_list_add(curr, (size_t) (data_in - part->data), data_in, between, false);
+                    if (curr == NULL) {
+                        mobi_list_del_all(first);
+                        array_free(links);
+                        debug_print("%s\n", "Memory allocation failed");
+                        return MOBI_MALLOC_FAILED;
+                    }
+                    new_size += curr->size;
+                }
+                data_in = after_end;
+            }
+        }
     }
     if (first) {
         /* last chunk */

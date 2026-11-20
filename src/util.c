@@ -2924,6 +2924,11 @@ size_t mobi_get_first_resource_record(const MOBIData *m) {
     if (m->mh && m->mh->image_index) {
         return *m->mh->image_index;
     }
+    /* a PalmDOC has no MOBI header: Mobipocket Creator put its resources
+       right after the text records */
+    if (m->mh == NULL && m->rh && m->rh->text_record_count) {
+        return (size_t) m->rh->text_record_count + 1;
+    }
     return MOBI_NOTSET;
 }
 
