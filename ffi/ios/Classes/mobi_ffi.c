@@ -1,0 +1,16 @@
+// Relative import to be able to reuse the C sources.
+// See the comment in ../mobi_ffi.podspec for more information.
+#include "../../mobi_ffi.c"
+#include "../../../src/memory.c"
+#include "../../../src/read.c"
+ #include "../../../src/buffer.c"
+#include "../../../src/compression.c"
+#include "../../../src/debug.c"
+#include "../../../src/index.c"
+#include "../../../src/meta.c"
+#include "../../../src/parse_rawml.c"
+#include "../../../src/structure.c"
+#include "../../../src/util.c"
+#include "../../../src/write.c"
+#include "../../../src/opf.c"
+#include "../../../src/xmlwriter.c"
