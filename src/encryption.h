@@ -11,6 +11,7 @@
 #ifndef mobi_encryption_h
 #define mobi_encryption_h
 
+#include "buffer.h"
 #include "config.h"
 #include "mobi.h"
 

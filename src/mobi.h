@@ -27,7 +27,7 @@
 #elif defined (_WIN32)
 #define MOBI_EXPORT __declspec(dllexport)
 #else
-#define MOBI_EXPORT __attribute__((__visibility__("default")))
+#define MOBI_EXPORT __attribute__((__visibility__("default"))) __attribute__((used))
 #endif
 
 /** 
@@ -43,6 +43,8 @@
 #define MOBI_COMPRESSION_NONE 1 /**< Text record compression type: none */
 #define MOBI_COMPRESSION_PALMDOC 2 /**< Text record compression type: palmdoc */
 #define MOBI_COMPRESSION_HUFFCDIC 17480 /**< Text record compression type: huff/cdic */
+
+#define USE_XMLWRITER
 
 #ifdef __cplusplus
 extern "C"

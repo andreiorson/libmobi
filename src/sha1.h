@@ -12,6 +12,9 @@
 #ifndef mobi_sha1_h
 #define mobi_sha1_h
 
+#include <stdint.h>
+#include <stddef.h>
+
 typedef struct {
     uint32_t state[5];
     uint32_t count[2];
